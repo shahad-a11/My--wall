@@ -2,44 +2,57 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>حائطي الإلكتروني</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>الحائط الإلكتروني - Padlet</title>
   <style>
-    body {
-      font-family: sans-serif;
-      background-color: #f0f0f0;
-      margin: 0;
-      padding: 20px;
-      direction: rtl;
-    }
-    .board {
-      display: flex;
-      gap: 20px;
-      justify-content: center;
-    }
-    .column {
-      background-color: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      width: 300px;
-      padding: 10px;
-    }
-    .column h2 {
-      text-align: center;
-      color: #333;
-    }
-    .card {
-      background-color: #e3eaff;
-      margin: 10px 0;
-      padding: 10px;
-      border-radius: 5px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; direction: rtl; background: #f0f2f5; }
+    #login, #wall { display: none; padding: 20px; }
+    #login.active, #wall.active { display: block; }
+    #login { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+    #login input { width: 80%; padding: 10px; margin: 10px 0; font-size: 16px; }
+    #login button { padding: 10px 20px; font-size: 16px; }
+    #wall { padding: 20px; }
+    .note { background: #fff; padding: 10px; margin: 10px; border-radius: 8px; display: inline-block; position: relative; }
+    .note .delete { position: absolute; top: 5px; left: 5px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; }
   </style>
 </head>
 <body>
-  <h1 style="text-align:center;">حائطي الإلكتروني</h1>
-  <div class="board">
-    <div class="column">
-      <h2>كل شيء</h2>
-      <div class="card">تصميم الواجهة</div
+  <div id="login" class="active">
+    <input type="text" id="username" placeholder="أدخل اسمك">
+    <button onclick="login()">تسجيل الدخول</button>
+  </div>
+  <div id="wall">
+    <button onclick="showAdd()">أضف ملاحظة</button>
+    <div id="notes"></div>
+    <div id="adder" style="display:none;">
+      <input type="text" id="newNote" placeholder="أدخل ملاحظتك">
+      <button onclick="addNote()">أضف</button>
+    </div>
+  </div>
+  <script>
+    function login() {
+      const u = document.getElementById('username').value.trim();
+      if (!u) return alert('اكتب اسمك');
+      document.getElementById('login').classList.remove('active');
+      document.getElementById('wall').classList.add('active');
+    }
+    function showAdd() {
+      document.getElementById('adder').style.display = 'block';
+    }
+    function addNote() {
+      const t = document.getElementById('newNote').value.trim();
+      if (!t) return;
+      const d = document.createElement('div');
+      d.className = 'note';
+      d.textContent = t;
+      const del = document.createElement('button');
+      del.textContent = '×'; del.className = 'delete';
+      del.onclick = () => d.remove();
+      d.appendChild(del);
+      document.getElementById('notes').appendChild(d);
+      document.getElementById('adder').style.display = 'none';
+      document.getElementById('newNote').value = '';
+    }
+  </script>
+</body>
+</html>
