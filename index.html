@@ -1,225 +1,52 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>حائط الأفكار</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: 'Tajawal', Arial, sans-serif; background: #fafafa; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 0 10px #eee; padding: 24px; }
+    h1 { text-align: center; color: #333; }
+    .wall { margin-top: 32px; }
+    .idea { background: #f0f0f8; margin-bottom: 16px; padding: 12px; border-radius: 5px; }
+    .add-idea { margin-top: 24px; display: flex; gap: 8px; }
+    input, button { padding: 8px; font-size: 1em; }
+    button { background: #1976D2; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #1565C0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>حائط الأفكار</h1>
+    <div class="wall" id="wall">
+      <!-- الأفكار تظهر هنا -->
+    </div>
+    <div class="add-idea">
+      <input type="text" id="ideaInput" placeholder="أكتب فكرتك هنا...">
+      <button onclick="addIdea()">إضافة</button>
+    </div>
+  </div>
+  <script>
+    const wall = document.getElementById('wall');
+    const ideaInput = document.getElementById('ideaInput');
+    let ideas = [];
 
-// خادم Express بسيط مع SQLite يدعم واجهة عربية
-import express from 'express';
-import cors from 'cors';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import Database from 'better-sqlite3';
-import 'dotenv/config';
+    function renderIdeas() {
+      wall.innerHTML = ideas.map(i => <div class="idea">${i}</div>).join('');
+    }
 
-const app = express();
-app.use(cors());
-app.use(express.json({limit:'10mb'}));
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+    function addIdea() {
+      const val = ideaInput.value.trim();
+      if (val) {
+        ideas.unshift(val);
+        ideaInput.value = '';
+        renderIdeas();
+      }
+    }
 
-const dbPath = path.join(process.cwd(), 'data', 'app.db');
-const db = new Database(dbPath);
-
-// إنشاء الجداول
-db.exec(`
-CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL,
-  role TEXT CHECK(role IN ('teacher','student')) NOT NULL,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS groups (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  grade TEXT,
-  teacher_id INTEGER,
-  invite_code TEXT UNIQUE,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(teacher_id) REFERENCES users(id)
-);
-CREATE TABLE IF NOT EXISTS group_members (
-  user_id INTEGER,
-  group_id INTEGER,
-  PRIMARY KEY (user_id, group_id),
-  FOREIGN KEY(user_id) REFERENCES users(id),
-  FOREIGN KEY(group_id) REFERENCES groups(id)
-);
-CREATE TABLE IF NOT EXISTS tasks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  group_id INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  description TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(group_id) REFERENCES groups(id)
-);
-CREATE TABLE IF NOT EXISTS submissions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  task_id INTEGER NOT NULL,
-  student_id INTEGER NOT NULL,
-  text TEXT,
-  file_url TEXT,
-  video_url TEXT,
-  image_url TEXT,
-  grade INTEGER,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(task_id) REFERENCES tasks(id),
-  FOREIGN KEY(student_id) REFERENCES users(id)
-);
-CREATE TABLE IF NOT EXISTS wall_posts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  group_id INTEGER NOT NULL,
-  author_id INTEGER NOT NULL,
-  type TEXT CHECK(type IN ('text','image','file','video')) NOT NULL,
-  content TEXT,
-  url TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(group_id) REFERENCES groups(id),
-  FOREIGN KEY(author_id) REFERENCES users(id)
-);
-`);
-
-// إدخال حسابات افتراضية إن لم توجد
-const exists = db.prepare("SELECT COUNT(*) as c FROM users").get().c;
-if (!exists) {
-  const hash = bcrypt.hashSync('123456', 10);
-  db.prepare("INSERT INTO users (name,email,password,role) VALUES (?,?,?,?)").run('المعلم', 'teacher@example.com', hash, 'teacher');
-  db.prepare("INSERT INTO users (name,email,password,role) VALUES (?,?,?,?)").run('الطالب', 'student@example.com', hash, 'student');
-}
-
-// تخزين المرفقات
-const uploadDir = process.env.UPLOAD_DIR || 'uploads';
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, {recursive:true});
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random()*1e9);
-    cb(null, unique + path.extname(file.originalname));
-  }
-});
-const upload = multer({ storage });
-
-// أدوات مساعدة
-const sign = (user) => jwt.sign({id:user.id, role:user.role, name:user.name}, process.env.JWT_SECRET, {expiresIn:'7d'});
-const auth = (roles) => (req,res,next)=>{
-  const h = req.headers.authorization || '';
-  const token = h.startsWith('Bearer ') ? h.slice(7) : null;
-  try{
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    if (roles && roles.length && !roles.includes(payload.role)) return res.status(403).json({message:'ليس لديك صلاحية'});
-    req.user = payload;
-    next();
-  }catch(e){
-    return res.status(401).json({message:'غير مصرح'});
-  }
-};
-
-// Auth
-app.post('/auth/register', (req,res)=>{
-  const {name,email,password,role} = req.body;
-  if(!name || !email || !password || !role) return res.status(400).json({message:'حقول ناقصة'});
-  const hash = bcrypt.hashSync(password,10);
-  try{
-    const info = db.prepare("INSERT INTO users (name,email,password,role) VALUES (?,?,?,?)").run(name,email,hash,role);
-    const user = db.prepare("SELECT id,name,email,role FROM users WHERE id=?").get(info.lastInsertRowid);
-    res.json({token:sign(user), user});
-  }catch(e){
-    res.status(409).json({message:'البريد مستخدم'});
-  }
-});
-app.post('/auth/login', (req,res)=>{
-  const {email,password}=req.body;
-  const user = db.prepare("SELECT * FROM users WHERE email=?").get(email);
-  if(!user) return res.status(401).json({message:'بيانات غير صحيحة'});
-  const ok = bcrypt.compareSync(password,user.password);
-  if(!ok) return res.status(401).json({message:'بيانات غير صحيحة'});
-  delete user.password;
-  res.json({token:sign(user), user});
-});
-
-// Groups
-app.post('/groups', auth(['teacher']), (req,res)=>{
-  const {name, grade} = req.body;
-  const code = Math.random().toString(36).slice(2,8);
-  const info = db.prepare("INSERT INTO groups (name,grade,teacher_id,invite_code) VALUES (?,?,?,?)")
-    .run(name,grade,req.user.id,code);
-  res.json(db.prepare("SELECT * FROM groups WHERE id=?").get(info.lastInsertRowid));
-});
-app.get('/groups/mine', auth(), (req,res)=>{
-  if (req.user.role==='teacher'){
-    const rows = db.prepare("SELECT * FROM groups WHERE teacher_id=?").all(req.user.id);
-    res.json(rows);
-  } else {
-    const rows = db.prepare(`SELECT g.* FROM groups g JOIN group_members gm ON g.id=gm.group_id WHERE gm.user_id=?`).all(req.user.id);
-    res.json(rows);
-  }
-});
-app.post('/groups/join', auth(['student']), (req,res)=>{
-  const {invite_code} = req.body;
-  const g = db.prepare("SELECT * FROM groups WHERE invite_code=?").get(invite_code);
-  if(!g) return res.status(404).json({message:'لا يوجد مجموعة بهذا الرابط'});
-  try{
-    db.prepare("INSERT INTO group_members (user_id, group_id) VALUES (?,?)").run(req.user.id, g.id);
-  }catch{}
-  res.json({message:'تم الانضمام', group:g});
-});
-
-// Tasks
-app.post('/tasks', auth(['teacher']), (req,res)=>{
-  const {group_id, title, description} = req.body;
-  const info = db.prepare("INSERT INTO tasks (group_id,title,description) VALUES (?,?,?)").run(group_id, title, description||'');
-  res.json(db.prepare("SELECT * FROM tasks WHERE id=?").get(info.lastInsertRowid));
-});
-app.get('/tasks/:group_id', auth(), (req,res)=>{
-  const rows = db.prepare("SELECT * FROM tasks WHERE group_id=? ORDER BY id DESC").all(req.params.group_id);
-  res.json(rows);
-});
-
-// Submissions (رفع مرفقات متعددة الأنواع)
-app.post('/submissions', auth(['student']), upload.single('file'), (req,res)=>{
-  const {task_id, text, video_url, image_url} = req.body;
-  const file_url = req.file ? '/uploads/'+req.file.filename : null;
-  const info = db.prepare("INSERT INTO submissions (task_id,student_id,text,file_url,video_url,image_url) VALUES (?,?,?,?,?,?)")
-    .run(task_id, req.user.id, text||null, file_url, video_url||null, image_url||null);
-  res.json(db.prepare("SELECT * FROM submissions WHERE id=?").get(info.lastInsertRowid));
-});
-app.get('/submissions/:task_id', auth(), (req,res)=>{
-  const rows = db.prepare("SELECT s.*, u.name as student_name FROM submissions s JOIN users u ON u.id=s.student_id WHERE task_id=?").all(req.params.task_id);
-  res.json(rows);
-});
-app.post('/submissions/:id/grade', auth(['teacher']), (req,res)=>{
-  const {grade} = req.body;
-  db.prepare("UPDATE submissions SET grade=? WHERE id=?").run(grade, req.params.id);
-  res.json({message:'تم التقييم'});
-});
-
-// Wall (حائط المتميزين)
-app.post('/wall', auth(), upload.single('file'), (req,res)=>{
-  const {group_id, type, content, url} = req.body;
-  const fileUrl = req.file ? '/uploads/'+req.file.filename : null;
-  const info = db.prepare("INSERT INTO wall_posts (group_id, author_id, type, content, url) VALUES (?,?,?,?,?)")
-    .run(group_id, req.user.id, type, content||null, fileUrl || url || null);
-  res.json(db.prepare("SELECT * FROM wall_posts WHERE id=?").get(info.lastInsertRowid));
-});
-app.get('/wall/:group_id', auth(), (req,res)=>{
-  const rows = db.prepare(`SELECT w.*, u.name as author_name FROM wall_posts w JOIN users u ON u.id=w.author_id WHERE group_id=? ORDER BY id DESC`).all(req.params.group_id);
-  res.json(rows);
-});
-
-// إحصاءات "الطلاب المجتازين" حسب الدرجات
-app.get('/groups/:group_id/passed', auth(), (req,res)=>{
-  const rows = db.prepare(`
-    SELECT u.id, u.name, COALESCE(AVG(s.grade),0) as avg_grade
-    FROM users u
-    JOIN group_members gm ON gm.user_id=u.id
-    LEFT JOIN submissions s ON s.student_id=u.id
-    WHERE gm.group_id=?
-    GROUP BY u.id
-    ORDER BY avg_grade DESC
-  `).all(req.params.group_id);
-  res.json(rows);
-});
-
-app.get('/', (req,res)=> res.json({ok:true, msg:'Monqez server running'}));
-
-const port = process.env.PORT || 4000;
-app.listen(port, ()=> console.log('Server on http://localhost:'+port));
+    // عرض الأفكار عند تحميل الصفحة
+    renderIdeas();
+  </script>
+</body>
+</html>
