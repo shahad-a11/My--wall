@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>حائط الأفكار</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: 'Tajawal', Arial, sans-serif; background: #fafafa; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 0 10px #eee; padding: 24px; }
+    h1 { text-align: center; color: #333; }
+    .wall { margin-top: 32px; }
+    .idea { background: #f0f0f8; margin-bottom: 16px; padding: 12px; border-radius: 5px; }
+    .add-idea { margin-top: 24px; display: flex; gap: 8px; }
+    input, button { padding: 8px; font-size: 1em; }
+    button { background: #1976D2; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #1565C0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>حائط الأفكار</h1>
+    <div class="wall" id="wall">
+      <!-- الأفكار تظهر هنا -->
+    </div>
+    <div class="add-idea">
+      <input type="text" id="ideaInput" placeholder="أكتب فكرتك هنا...">
+      <button onclick="addIdea()">إضافة</button>
+    </div>
+  </div>
+  <script>
+    const wall = document.getElementById('wall');
+    const ideaInput = document.getElementById('ideaInput');
+    let ideas = [];
+
+    function renderIdeas() {
+      wall.innerHTML = ideas.map(i => <div class="idea">${i}</div>).join('');
+    }
+
+    function addIdea() {
+      const val = ideaInput.value.trim();
+      if (val) {
+        ideas.unshift(val);
+        ideaInput.value = '';
+        renderIdeas();
+      }
+    }
+
+    // عرض الأفكار عند تحميل الصفحة
+    renderIdeas();
+  </script>
+</body>
+</html>
